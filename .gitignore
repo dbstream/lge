@@ -1,0 +1,6 @@
+##
+# .gitignore for LGE (Lightweight Game Engine)
+# Copyright (C) 2024  dbstream
+##
+
+build/

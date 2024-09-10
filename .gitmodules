@@ -1,0 +1,3 @@
+[submodule "vendor/vkfw"]
+	path = vendor/vkfw
+	url = https://github.com/dbstream/vkfw.git
