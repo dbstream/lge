@@ -5,98 +5,15 @@
 #define LGE_MODULE "Example"
 
 #include <LGE/Application.h>
+#include <LGE/GPUMemory.h>
 #include <LGE/Init.h>
 #include <LGE/Pipeline.h>
 #include <LGE/VulkanFunctions.h>
 
 #include <stdexcept>
 
-/**
- * Fragment shader source:
- *	layout (location = 0) in vec4 color_;
- *	layout (location = 0) out vec4 color;
- *
- *	void
- *	main (void)
- *	{
- *		color = color_;
- *	}
- *
- * Compilation: glslang -V100 --glsl-version 460 -Os -g0
- */
-static const uint32_t fragment_shader[] = {
-	0x07230203,0x00010000,0x0008000b,0x0000000d,0x00000000,0x00020011,0x00000001,0x0006000b,
-	0x00000001,0x4c534c47,0x6474732e,0x3035342e,0x00000000,0x0003000e,0x00000000,0x00000001,
-	0x0007000f,0x00000004,0x00000004,0x6e69616d,0x00000000,0x00000009,0x0000000b,0x00030010,
-	0x00000004,0x00000007,0x00040047,0x00000009,0x0000001e,0x00000000,0x00040047,0x0000000b,
-	0x0000001e,0x00000000,0x00020013,0x00000002,0x00030021,0x00000003,0x00000002,0x00030016,
-	0x00000006,0x00000020,0x00040017,0x00000007,0x00000006,0x00000004,0x00040020,0x00000008,
-	0x00000003,0x00000007,0x0004003b,0x00000008,0x00000009,0x00000003,0x00040020,0x0000000a,
-	0x00000001,0x00000007,0x0004003b,0x0000000a,0x0000000b,0x00000001,0x00050036,0x00000002,
-	0x00000004,0x00000000,0x00000003,0x000200f8,0x00000005,0x0004003d,0x00000007,0x0000000c,
-	0x0000000b,0x0003003e,0x00000009,0x0000000c,0x000100fd,0x00010038
-};
-
-/**
- * Vertex shader source:
- *	layout (location = 0) out vec4 color;
- *
- *	vec4 positions[3] = {
- *		vec4 (0.0, -0.5, 0.0, 1.0),
- *		vec4 (0.5, 0.5, 0.0, 1.0),
- *		vec4 (-0.5, 0.5, 0.0, 1.0)
- *	};
- *
- *	vec4 colors[3] = {
- *		vec4 (1.0, 0.0, 0.0, 1.0),
- *		vec4 (0.0, 1.0, 0.0, 1.0),
- *		vec4 (0.0, 0.0, 1.0, 1.0)
- *	};
- *
- *	void
- *	main (void)
- *	{
- *		gl_Position = positions[gl_VertexIndex];
- *		color = colors[gl_VertexIndex];
- *	}
- *
- * Compilation: glslang -V100 --glsl-version 460 -Os -g0
- */
-static const uint32_t vertex_shader[] = {
-	0x07230203,0x00010000,0x0008000b,0x0000002d,0x00000000,0x00020011,0x00000001,0x0006000b,
-	0x00000001,0x4c534c47,0x6474732e,0x3035342e,0x00000000,0x0003000e,0x00000000,0x00000001,
-	0x0008000f,0x00000000,0x00000004,0x6e69616d,0x00000000,0x0000001e,0x00000022,0x00000029,
-	0x00050048,0x0000001c,0x00000000,0x0000000b,0x00000000,0x00050048,0x0000001c,0x00000001,
-	0x0000000b,0x00000001,0x00050048,0x0000001c,0x00000002,0x0000000b,0x00000003,0x00050048,
-	0x0000001c,0x00000003,0x0000000b,0x00000004,0x00030047,0x0000001c,0x00000002,0x00040047,
-	0x00000022,0x0000000b,0x0000002a,0x00040047,0x00000029,0x0000001e,0x00000000,0x00020013,
-	0x00000002,0x00030021,0x00000003,0x00000002,0x00030016,0x00000006,0x00000020,0x00040017,
-	0x00000007,0x00000006,0x00000004,0x00040015,0x00000008,0x00000020,0x00000000,0x0004002b,
-	0x00000008,0x00000009,0x00000003,0x0004001c,0x0000000a,0x00000007,0x00000009,0x00040020,
-	0x0000000b,0x00000006,0x0000000a,0x0004003b,0x0000000b,0x0000000c,0x00000006,0x0004002b,
-	0x00000006,0x0000000d,0x00000000,0x0004002b,0x00000006,0x0000000e,0xbf000000,0x0004002b,
-	0x00000006,0x0000000f,0x3f800000,0x0007002c,0x00000007,0x00000010,0x0000000d,0x0000000e,
-	0x0000000d,0x0000000f,0x0004002b,0x00000006,0x00000011,0x3f000000,0x0007002c,0x00000007,
-	0x00000012,0x00000011,0x00000011,0x0000000d,0x0000000f,0x0007002c,0x00000007,0x00000013,
-	0x0000000e,0x00000011,0x0000000d,0x0000000f,0x0006002c,0x0000000a,0x00000014,0x00000010,
-	0x00000012,0x00000013,0x0004003b,0x0000000b,0x00000015,0x00000006,0x0007002c,0x00000007,
-	0x00000016,0x0000000f,0x0000000d,0x0000000d,0x0000000f,0x0007002c,0x00000007,0x00000017,
-	0x0000000d,0x0000000f,0x0000000d,0x0000000f,0x0007002c,0x00000007,0x00000018,0x0000000d,
-	0x0000000d,0x0000000f,0x0000000f,0x0006002c,0x0000000a,0x00000019,0x00000016,0x00000017,
-	0x00000018,0x0004002b,0x00000008,0x0000001a,0x00000001,0x0004001c,0x0000001b,0x00000006,
-	0x0000001a,0x0006001e,0x0000001c,0x00000007,0x00000006,0x0000001b,0x0000001b,0x00040020,
-	0x0000001d,0x00000003,0x0000001c,0x0004003b,0x0000001d,0x0000001e,0x00000003,0x00040015,
-	0x0000001f,0x00000020,0x00000001,0x0004002b,0x0000001f,0x00000020,0x00000000,0x00040020,
-	0x00000021,0x00000001,0x0000001f,0x0004003b,0x00000021,0x00000022,0x00000001,0x00040020,
-	0x00000024,0x00000006,0x00000007,0x00040020,0x00000027,0x00000003,0x00000007,0x0004003b,
-	0x00000027,0x00000029,0x00000003,0x00050036,0x00000002,0x00000004,0x00000000,0x00000003,
-	0x000200f8,0x00000005,0x0003003e,0x0000000c,0x00000014,0x0003003e,0x00000015,0x00000019,
-	0x0004003d,0x0000001f,0x00000023,0x00000022,0x00050041,0x00000024,0x00000025,0x0000000c,
-	0x00000023,0x0004003d,0x00000007,0x00000026,0x00000025,0x00050041,0x00000027,0x00000028,
-	0x0000001e,0x00000020,0x0003003e,0x00000028,0x00000026,0x00050041,0x00000024,0x0000002b,
-	0x00000015,0x00000023,0x0004003d,0x00000007,0x0000002c,0x0000002b,0x0003003e,0x00000029,
-	0x0000002c,0x000100fd,0x00010038
-};
+#include "position_color.frag.txt"
+#include "position_color.vert.txt"
 
 class HelloTrianglePipeline : public LGE::Pipeline {
 	VkPipelineLayout m_layout;
@@ -122,8 +39,27 @@ public:
 	virtual void
 	Create (void) override
 	{
+		VkVertexInputBindingDescription vertex_input_binding {};
+		vertex_input_binding.binding = 0;
+		vertex_input_binding.stride = 8 * sizeof (float);
+		vertex_input_binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+		VkVertexInputAttributeDescription vertex_input_attributes[2] {};
+		vertex_input_attributes[0].location = 0;
+		vertex_input_attributes[0].binding = 0;
+		vertex_input_attributes[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		vertex_input_attributes[0].offset = 0;
+		vertex_input_attributes[1].location = 1;
+		vertex_input_attributes[1].binding = 0;
+		vertex_input_attributes[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		vertex_input_attributes[1].offset = 4 * sizeof (float);
+
 		VkPipelineVertexInputStateCreateInfo vertex_input_state {};
 		vertex_input_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
+		vertex_input_state.vertexBindingDescriptionCount = 1;
+		vertex_input_state.pVertexBindingDescriptions = &vertex_input_binding;
+		vertex_input_state.vertexAttributeDescriptionCount = 2;
+		vertex_input_state.pVertexAttributeDescriptions = vertex_input_attributes;
 
 		VkPipelineInputAssemblyStateCreateInfo input_assembly_state {};
 		input_assembly_state.sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO;
@@ -205,6 +141,13 @@ public:
 };
 
 static HelloTrianglePipeline *hello_triangle = nullptr;
+static LGE::GPUBuffer hello_buffer;
+
+static const float buffer_data[] = {
+	0.0f,	-0.5f,	0.0f,	1.0f,	1.0f,	0.0f,	0.0f,	1.0f,
+	0.5f,	0.5f,	0.0f,	1.0f,	0.0f,	1.0f,	0.0f,	1.0f,
+	-0.5f,	0.5f,	0.0f,	1.0f,	0.0f,	0.0f,	1.0f,	1.0f
+};
 
 class ExampleApplication : public LGE::Application {
 public:
@@ -220,6 +163,10 @@ public:
 		if (!hello_triangle)
 			hello_triangle = new HelloTrianglePipeline;
 
+		if (!hello_buffer)
+			hello_buffer = LGE::MMCreateMeshGPUBuffer (buffer_data,
+				sizeof (buffer_data), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT);
+
 		VkViewport viewport {};
 		viewport.x = 0.0f;
 		viewport.y = 0.0f;
@@ -230,10 +177,14 @@ public:
 
 		VkRect2D scissor {};
 		scissor.extent = m_extent;
+		VkDeviceSize offset = 0;
 
 		hello_triangle->Bind (cmd, VK_PIPELINE_BIND_POINT_GRAPHICS);
+
 		vkCmdSetViewport (cmd, 0, 1, &viewport);
 		vkCmdSetScissor (cmd, 0, 1, &scissor);
+
+		vkCmdBindVertexBuffers (cmd, 0, 1, &hello_buffer.m_buffer, &offset);
 		vkCmdDraw (cmd, 3, 1, 0, 0);
 	}
 
@@ -244,6 +195,9 @@ public:
 			delete hello_triangle;
 			hello_triangle = nullptr;
 		}
+
+		if (hello_buffer)
+			LGE::MMDestroyGPUBuffer (hello_buffer);
 
 		LGE::Application::Cleanup ();
 	}

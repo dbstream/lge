@@ -22,10 +22,12 @@ target_link_libraries (lge vkfw)
 
 target_sources (lge PRIVATE
 	"LGE/Application.cc"
+	"LGE/GPUMemory.cc"
 	"LGE/Init.cc"
 	"LGE/Log.cc"
 	"LGE/Pipeline.cc"
 	"LGE/Vulkan.cc"
+	"LGE/VulkanMemoryAllocator.cc"
 	"LGE/Window.cc"
 )
 

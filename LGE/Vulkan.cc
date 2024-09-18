@@ -5,6 +5,7 @@
 #define LGE_MODULE "LGEVulkan"
 
 #include <LGE/Application.h>
+#include <LGE/GPUMemory.h>
 #include <LGE/Init.h>
 #include <LGE/Log.h>
 #include <LGE/Vulkan.h>
@@ -235,12 +236,16 @@ InitializeVulkan (void)
 
 	::vkGetDeviceQueue (gVkDevice, gVkQueueFamily, 0, &gVkQueue);
 
+	MMInit ();
+
 	return true;
 }
 
 void
 TerminateVulkan (void)
 {
+	MMTerminate ();
+
 	// vkfwTerminate() will destroy the VkDevice and the VkInstance for us.
 }
 
