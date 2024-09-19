@@ -39,12 +39,15 @@ public:
 	virtual void
 	Create (void) override
 	{
-		VkVertexInputBindingDescription vertex_input_binding {};
-		vertex_input_binding.binding = 0;
-		vertex_input_binding.stride = 8 * sizeof (float);
-		vertex_input_binding.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		VkVertexInputBindingDescription vertex_input_bindings[2] {};
+		vertex_input_bindings[0].binding = 0;
+		vertex_input_bindings[0].stride = 8 * sizeof (float);
+		vertex_input_bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		vertex_input_bindings[1].binding = 1;
+		vertex_input_bindings[1].stride = 2 * sizeof (float);
+		vertex_input_bindings[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
 
-		VkVertexInputAttributeDescription vertex_input_attributes[2] {};
+		VkVertexInputAttributeDescription vertex_input_attributes[3] {};
 		vertex_input_attributes[0].location = 0;
 		vertex_input_attributes[0].binding = 0;
 		vertex_input_attributes[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -53,12 +56,16 @@ public:
 		vertex_input_attributes[1].binding = 0;
 		vertex_input_attributes[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
 		vertex_input_attributes[1].offset = 4 * sizeof (float);
+		vertex_input_attributes[2].location = 2;
+		vertex_input_attributes[2].binding = 1;
+		vertex_input_attributes[2].format = VK_FORMAT_R32G32_SFLOAT;
+		vertex_input_attributes[2].offset = 0;
 
 		VkPipelineVertexInputStateCreateInfo vertex_input_state {};
 		vertex_input_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		vertex_input_state.vertexBindingDescriptionCount = 1;
-		vertex_input_state.pVertexBindingDescriptions = &vertex_input_binding;
-		vertex_input_state.vertexAttributeDescriptionCount = 2;
+		vertex_input_state.vertexBindingDescriptionCount = 2;
+		vertex_input_state.pVertexBindingDescriptions = vertex_input_bindings;
+		vertex_input_state.vertexAttributeDescriptionCount = 3;
 		vertex_input_state.pVertexAttributeDescriptions = vertex_input_attributes;
 
 		VkPipelineInputAssemblyStateCreateInfo input_assembly_state {};
@@ -177,15 +184,26 @@ public:
 
 		VkRect2D scissor {};
 		scissor.extent = m_extent;
-		VkDeviceSize offset = 0;
 
 		hello_triangle->Bind (cmd, VK_PIPELINE_BIND_POINT_GRAPHICS);
 
 		vkCmdSetViewport (cmd, 0, 1, &viewport);
 		vkCmdSetScissor (cmd, 0, 1, &scissor);
 
-		vkCmdBindVertexBuffers (cmd, 0, 1, &hello_buffer.m_buffer, &offset);
-		vkCmdDraw (cmd, 3, 1, 0, 0);
+		float instance_info[] = {
+			-0.5f, 0.5f,
+			0.5f, 0.5f,
+			0.0f, -0.5f
+		};
+
+		VkDeviceSize offsets[2] = { 0, 0 };
+		VkBuffer buffers[2] = {
+			hello_buffer.m_buffer,
+			LGE::MMCreateTemporaryGPUBuffer (instance_info,
+				sizeof (instance_info), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
+		};
+		vkCmdBindVertexBuffers (cmd, 0, 2, buffers, offsets);
+		vkCmdDraw (cmd, 3, sizeof (instance_info) / (2 * sizeof (float)), 0, 0);
 	}
 
 	virtual void

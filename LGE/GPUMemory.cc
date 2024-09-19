@@ -4,12 +4,15 @@
  */
 #define LGE_MODULE "LGEGpuMemory"
 
+#include <LGE/Application.h>
 #include <LGE/GPUMemory.h>
 #include <LGE/Log.h>
 #include <LGE/VulkanFunctions.h>
 
 #include <stdexcept>
 #include <string.h>
+
+#include <vector>
 
 #include "../vendor/vk_mem_alloc.h"
 
@@ -38,6 +41,10 @@ MMInit (void)
 void
 MMTerminate (void)
 {
+	// quick and dirty way to flush temporary buffers
+	for (size_t i = 0; i < CPU_RENDER_AHEAD; i++)
+		MMNextFrame ();
+
 	::vmaDestroyAllocator (gAllocator);
 }
 
@@ -148,6 +155,7 @@ MMCopyToGPUBuffer (GPUBuffer &target, const void *data, size_t size, size_t offs
 
 	VkCommandBufferBeginInfo begin_info {};
 	begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 	result = ::vkBeginCommandBuffer (cmd, &begin_info);
 	if (result != VK_SUCCESS) {
 		::vkDestroyCommandPool (gVkDevice, pool, nullptr);
@@ -187,6 +195,60 @@ MMCopyToGPUBuffer (GPUBuffer &target, const void *data, size_t size, size_t offs
 
 	if (result != VK_SUCCESS)
 		throw std::runtime_error (std::string ("vkQueueWaitIdle returned ") + VulkanTypeToString (result));
+}
+
+static size_t stash_index = 0;
+static std::vector<GPUBuffer> stash[CPU_RENDER_AHEAD];
+
+VkBuffer
+MMCreateTemporaryGPUBuffer (const void *data, size_t size, VkBufferUsageFlags usage)
+{
+	if (size > UINT64_MAX)
+		throw std::runtime_error ("MMCreateTemporaryGPUBuffer: too large!");
+
+	VkBufferCreateInfo buffer_ci {};
+	buffer_ci.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+	buffer_ci.size = size;
+	buffer_ci.usage = usage;
+	buffer_ci.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+	buffer_ci.queueFamilyIndexCount = 1;
+	buffer_ci.pQueueFamilyIndices = &gVkQueueFamily;
+
+	VmaAllocationCreateInfo alloc_info {};
+	alloc_info.flags = VMA_ALLOCATION_CREATE_MAPPED_BIT
+		| VMA_ALLOCATION_CREATE_HOST_ACCESS_SEQUENTIAL_WRITE_BIT;
+	alloc_info.usage = VMA_MEMORY_USAGE_AUTO;
+	alloc_info.priority = 0.5f;
+
+	GPUBuffer buffer;
+	VmaAllocationInfo info;
+	VkResult result = ::vmaCreateBuffer (gAllocator, &buffer_ci, &alloc_info,
+		&buffer.m_buffer, &buffer.m_allocation, &info);
+
+	if (result != VK_SUCCESS)
+		throw std::runtime_error (std::string ("vmaCreateBuffer returned ") + VulkanTypeToString (result));
+
+	try {
+		stash[stash_index].push_back (buffer);
+	} catch (...) {
+		::vmaDestroyBuffer (gAllocator, buffer.m_buffer, buffer.m_allocation);
+		throw;
+	}
+
+	::memcpy (info.pMappedData, data, size);
+	return buffer.m_buffer;
+}
+
+void
+MMNextFrame (void)
+{
+	stash_index++;
+	if (stash_index >= CPU_RENDER_AHEAD)
+		stash_index = 0;
+
+	for (GPUBuffer &b : stash[stash_index])
+		MMDestroyGPUBuffer (b);
+	stash[stash_index].clear ();
 }
 
 }

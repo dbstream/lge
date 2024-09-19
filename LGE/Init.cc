@@ -97,6 +97,7 @@ LGEMain (Application &app, const char *const *argv)
 
 	TerminateVulkan ();
 	::vkfwTerminate ();
+	Log ("Exit code is %d", gExitCode);
 	return gExitCode;
 }
 

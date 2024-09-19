@@ -5,6 +5,7 @@
 #define LGE_MODULE "LGEApplication"
 
 #include <LGE/Application.h>
+#include <LGE/GPUMemory.h>
 #include <LGE/Log.h>
 #include <LGE/Vulkan.h>
 #include <LGE/Window.h>
@@ -154,9 +155,15 @@ Application::Render (void)
 
 	VkCommandBufferBeginInfo begin_info {};
 	begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 	result = ::vkBeginCommandBuffer (cmd, &begin_info);
 	if (result != VK_SUCCESS)
 		throw std::runtime_error (std::string ("vkBeginCommandBuffer returned ") + VulkanTypeToString (result));
+
+	m_frameIndex++;
+	if (m_frameIndex >= CPU_RENDER_AHEAD)
+		m_frameIndex = 0;
+	MMNextFrame ();
 
 	this->BeginRendering (cmd, m_renderPass, m_framebuffer, gWindow->GetImageView (swapchain_index));
 	this->Draw (cmd);
@@ -186,9 +193,6 @@ Application::Render (void)
 		throw std::runtime_error (std::string ("vkQueueSubmit returned ") + VulkanTypeToString (result));
 
 	gWindow->PresentSwapchainImage (swapchain_index, sema1);
-	m_frameIndex++;
-	if (m_frameIndex >= CPU_RENDER_AHEAD)
-		m_frameIndex = 0;
 }
 
 VkRenderPass

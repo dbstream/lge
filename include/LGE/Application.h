@@ -13,11 +13,15 @@ typedef struct VKFWevent_T VKFWevent;
 
 namespace LGE {
 
+/**
+ * CPU render ahead affects resource management outside the scope of Application
+ * too. Keep it a constexpr global.
+ */
+static constexpr size_t CPU_RENDER_AHEAD = 3;
+
 class Application {
 private:
 	bool m_keep_running = true;
-
-	static constexpr size_t CPU_RENDER_AHEAD = 3;
 	size_t m_frameIndex = 0;
 
 	VkFramebuffer m_framebuffer = VK_NULL_HANDLE;
