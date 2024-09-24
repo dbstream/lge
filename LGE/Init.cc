@@ -13,7 +13,7 @@
 #include <VKFW/vkfw.h>
 #include <string.h>
 
-#include <exception>
+#include <stdexcept>
 
 namespace LGE {
 
@@ -29,6 +29,9 @@ setup_opts_for_prod (void)
 	// Do not disable logging until we are past initialization.
 	bIsProduction = true;
 }
+
+static void
+event_handler (VKFWevent *e, void *user);
 
 int
 LGEMain (Application &app, const char *const *argv)
@@ -74,6 +77,8 @@ LGEMain (Application &app, const char *const *argv)
 		return gExitCode;
 	}
 
+	::vkfwSetEventHandler (event_handler, nullptr);
+
 	// If we are in production, disable logging now.
 	Log ("Initialization was successful");
 	if (bIsProduction)
@@ -101,57 +106,44 @@ LGEMain (Application &app, const char *const *argv)
 	return gExitCode;
 }
 
+static bool event_handler_has_thrown = false;
+
+static void
+event_handler (VKFWevent *e, void *user)
+{
+	(void) user;
+	try {
+		if (gApplication->KeepRunning ())
+			gApplication->HandleEvent (*e);
+	} catch (const std::exception &e) {
+		event_handler_has_thrown = true;
+		bLoggingEnabled = true;
+		Log ("Caught an exception in an event handler: %s", e.what ());
+	}
+}
+
 static void
 run_event_loop (void)
 {
-	VKFWevent e;
-
+	VkResult result;
 	uint64_t prevFrameTime = vkfwGetTime ();
 
-	auto get_event = [&](void) -> bool {
-		VkResult result;
+	while (gApplication->KeepRunning ()) {
+		if (gWindow && gWindow->IsVsyncSwapchain ())
+			result = ::vkfwDispatchEvents (VKFW_EVENT_MODE_POLL, 0);
+		else
+			result = ::vkfwDispatchEvents (VKFW_EVENT_MODE_DEADLINE, prevFrameTime + 16666);
 
-		/**
-		 * If we have a VSync swapchain, acquire will block, thus
-		 * avoiding CPU burn. Otherwise, we have to block ourselves.
-		 */
-
-		if (gWindow && gWindow->IsVsyncSwapchain ()) {
-			if ((result = ::vkfwGetNextEvent (&e)) == VK_SUCCESS)
-				return true;
-			Log ("vkfwGetNextEvent returned %s", VulkanTypeToString (result));
-			return false;
+		if (result != VK_SUCCESS) {
+			Log ("vkfwDispatchEvents returned %s", VulkanTypeToString (result));
+			throw std::runtime_error ("vkfwDispatchEvents failed");
 		}
 
-		// 16666 means "wait 16.6 milliseconds", thus giving us 60fps.
-		if ((result = ::vkfwWaitNextEventUntil (&e, prevFrameTime + 16666)) == VK_SUCCESS)
-			return true;
-		Log ("vkfwWaitNextEvent returned %s", VulkanTypeToString (result));
-		return false;
-	};
-
-	while (gApplication->KeepRunning ()) {
-
-		// 1. pump events
-		do {
-			if (!get_event ()) {
-				gExitCode = 1;
-				return;
-			}
-
-			// do not dispatch NONE and NULL events
-			if (e.type != VKFW_EVENT_NONE && e.type != VKFW_EVENT_NULL) {
-				gApplication->HandleEvent (e);
-
-				// HandleEvent can change KeepRunning
-				if (!gApplication->KeepRunning ())
-					break;
-			}
-		} while (e.type != VKFW_EVENT_NONE);
+		if (event_handler_has_thrown) {
+			throw std::runtime_error ("An event handler threw an exception");
+		}
 
 		prevFrameTime = vkfwGetTime ();
-
-		// 2. render
 		gApplication->Render ();
 	}
 }
