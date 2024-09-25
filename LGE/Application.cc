@@ -51,6 +51,10 @@ Application::HandleEvent (const VKFWevent &e)
 	if (e.type == VKFW_EVENT_WINDOW_CLOSE_REQUEST) {
 		Log ("Exiting due to WINDOW_CLOSE_REQUEST");
 		m_keep_running = false;
+	} else if (e.type == VKFW_EVENT_WINDOW_RESIZE_NOTIFY) {
+		Window *wnd = (Window *) vkfwGetWindowUserPointer (e.window);
+		if (wnd)
+			wnd->SetSwapchainDirty ();
 	}
 }
 

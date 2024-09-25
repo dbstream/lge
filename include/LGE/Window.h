@@ -124,6 +124,18 @@ public:
 	{
 		return m_generation;
 	}
+
+	/**
+	 * Set the swapchainDirty flag to true.
+	 *
+	 * This should be called when the WINDOW_RESIZE_NOTIFY event is
+	 * received.
+	 */
+	void
+	SetSwapchainDirty (void)
+	{
+		m_swapchainDirty = true;
+	}
 };
 
 extern Window *gWindow;
