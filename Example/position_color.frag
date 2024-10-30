@@ -8,6 +8,10 @@ layout (location = 0) in struct {
 
 layout (location = 0) out vec4 color;
 
+layout (set = 0, binding = 0) uniform Uniform_T {
+	float modulator;
+} Uniform;
+
 vec3
 eotf (vec3 c)
 {
@@ -20,5 +24,5 @@ eotf (vec3 c)
 void
 main (void)
 {
-	color = vec4 (eotf (In.color.rgb), In.color.a);
+	color = vec4 (eotf (Uniform.modulator * In.color.rgb), In.color.a);
 }

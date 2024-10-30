@@ -5,6 +5,7 @@
 #define LGE_MODULE "LGEGpuMemory"
 
 #include <LGE/Application.h>
+#include <LGE/Descriptor.h>
 #include <LGE/GPUMemory.h>
 #include <LGE/Log.h>
 #include <LGE/VulkanFunctions.h>
@@ -36,11 +37,15 @@ MMInit (void)
 	VkResult result = ::vmaCreateAllocator (&allocator_ci, &gAllocator);
 	if (result != VK_SUCCESS)
 		throw std::runtime_error (std::string ("vmaCreateAllocator returned ") + VulkanTypeToString (result));
+
+	DescriptorInit ();
 }
 
 void
 MMTerminate (void)
 {
+	DescriptorTerminate ();
+
 	// quick and dirty way to flush temporary buffers
 	for (size_t i = 0; i < CPU_RENDER_AHEAD; i++)
 		MMNextFrame ();
@@ -242,6 +247,8 @@ MMCreateTemporaryGPUBuffer (const void *data, size_t size, VkBufferUsageFlags us
 void
 MMNextFrame (void)
 {
+	DescriptorNextFrame ();
+
 	stash_index++;
 	if (stash_index >= CPU_RENDER_AHEAD)
 		stash_index = 0;

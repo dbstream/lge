@@ -5,24 +5,35 @@
 #define LGE_MODULE "Example"
 
 #include <LGE/Application.h>
+#include <LGE/Descriptor.h>
 #include <LGE/GPUMemory.h>
 #include <LGE/Init.h>
 #include <LGE/Pipeline.h>
 #include <LGE/VulkanFunctions.h>
 
+#include <cmath>
 #include <stdexcept>
 
 #include "position_color.frag.txt"
 #include "position_color.vert.txt"
 
+static LGE::DescriptorSetLayout set_layout = nullptr;
+
 class HelloTrianglePipeline : public LGE::Pipeline {
-	VkPipelineLayout m_layout;
 public:
+	VkPipelineLayout m_layout;
+
 	HelloTrianglePipeline (void)
 		: LGE::Pipeline ()
 	{
+		VkDescriptorSetLayout set_layouts[1] = {
+			LGE::GetVkDescriptorSetLayout (set_layout)
+		};
+
 		VkPipelineLayoutCreateInfo layout_ci {};
 		layout_ci.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
+		layout_ci.setLayoutCount = 1;
+		layout_ci.pSetLayouts = set_layouts;
 
 		VkResult result = vkCreatePipelineLayout (LGE::gVkDevice,
 			&layout_ci, nullptr, &m_layout);
@@ -167,6 +178,21 @@ public:
 	virtual void
 	Draw (VkCommandBuffer cmd) override
 	{
+		if (!set_layout) {
+			VkDescriptorSetLayoutBinding bindings[1] {};
+			bindings[0].binding = 0;
+			bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+			bindings[0].descriptorCount = 1;
+			bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+			VkDescriptorSetLayoutCreateInfo ci {};
+			ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+			ci.bindingCount = 1;
+			ci.pBindings = bindings;
+
+			set_layout = LGE::GetDescriptorSetLayout (&ci);
+		}
+
 		if (!hello_triangle)
 			hello_triangle = new HelloTrianglePipeline;
 
@@ -185,7 +211,26 @@ public:
 		VkRect2D scissor {};
 		scissor.extent = m_extent;
 
+		VkDescriptorSet set = LGE::CreateTemporaryDescriptorSet (set_layout);
+
+		float uniform_vars[1] = { 1.5f + 0.5f * std::sinf (vkfwGetTime () / 250000.0f) };
+		VkDescriptorBufferInfo b {};
+		b.buffer = LGE::MMCreateTemporaryGPUBuffer (uniform_vars, sizeof (uniform_vars),
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+		b.range = VK_WHOLE_SIZE;
+		VkWriteDescriptorSet w {};
+		w.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		w.dstSet = set;
+		w.dstBinding = 0;
+		w.dstArrayElement = 0;
+		w.descriptorCount = 1;
+		w.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		w.pBufferInfo = &b;
+		vkUpdateDescriptorSets (LGE::gVkDevice, 1, &w, 0, nullptr);
+
 		hello_triangle->Bind (cmd, VK_PIPELINE_BIND_POINT_GRAPHICS);
+		vkCmdBindDescriptorSets (cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
+			hello_triangle->m_layout, 0, 1, &set, 0, nullptr);
 
 		vkCmdSetViewport (cmd, 0, 1, &viewport);
 		vkCmdSetScissor (cmd, 0, 1, &scissor);

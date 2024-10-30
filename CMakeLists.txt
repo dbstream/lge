@@ -22,6 +22,7 @@ target_link_libraries (lge vkfw)
 
 target_sources (lge PRIVATE
 	"LGE/Application.cc"
+	"LGE/Descriptor.cc"
 	"LGE/GPUMemory.cc"
 	"LGE/Init.cc"
 	"LGE/Log.cc"
