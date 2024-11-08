@@ -11,6 +11,8 @@
 #include <LGE/Pipeline.h>
 #include <LGE/VulkanFunctions.h>
 
+#include <LGE/Math.h>
+
 #include <cmath>
 #include <stdexcept>
 
@@ -26,14 +28,20 @@ public:
 	HelloTrianglePipeline (void)
 		: LGE::Pipeline ()
 	{
-		VkDescriptorSetLayout set_layouts[1] = {
+		VkDescriptorSetLayout layouts[1] = {
 			LGE::GetVkDescriptorSetLayout (set_layout)
 		};
+
+		VkPushConstantRange ranges[1] {};
+		ranges[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		ranges[0].size = sizeof (glm::mat4);
 
 		VkPipelineLayoutCreateInfo layout_ci {};
 		layout_ci.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
 		layout_ci.setLayoutCount = 1;
-		layout_ci.pSetLayouts = set_layouts;
+		layout_ci.pSetLayouts = layouts;
+		layout_ci.pushConstantRangeCount = 1;
+		layout_ci.pPushConstantRanges = ranges;
 
 		VkResult result = vkCreatePipelineLayout (LGE::gVkDevice,
 			&layout_ci, nullptr, &m_layout);
@@ -50,15 +58,12 @@ public:
 	virtual void
 	Create (void) override
 	{
-		VkVertexInputBindingDescription vertex_input_bindings[2] {};
+		VkVertexInputBindingDescription vertex_input_bindings[1] {};
 		vertex_input_bindings[0].binding = 0;
 		vertex_input_bindings[0].stride = 8 * sizeof (float);
 		vertex_input_bindings[0].inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-		vertex_input_bindings[1].binding = 1;
-		vertex_input_bindings[1].stride = 2 * sizeof (float);
-		vertex_input_bindings[1].inputRate = VK_VERTEX_INPUT_RATE_INSTANCE;
 
-		VkVertexInputAttributeDescription vertex_input_attributes[3] {};
+		VkVertexInputAttributeDescription vertex_input_attributes[2] {};
 		vertex_input_attributes[0].location = 0;
 		vertex_input_attributes[0].binding = 0;
 		vertex_input_attributes[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -67,16 +72,12 @@ public:
 		vertex_input_attributes[1].binding = 0;
 		vertex_input_attributes[1].format = VK_FORMAT_R32G32B32A32_SFLOAT;
 		vertex_input_attributes[1].offset = 4 * sizeof (float);
-		vertex_input_attributes[2].location = 2;
-		vertex_input_attributes[2].binding = 1;
-		vertex_input_attributes[2].format = VK_FORMAT_R32G32_SFLOAT;
-		vertex_input_attributes[2].offset = 0;
 
 		VkPipelineVertexInputStateCreateInfo vertex_input_state {};
 		vertex_input_state.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
-		vertex_input_state.vertexBindingDescriptionCount = 2;
+		vertex_input_state.vertexBindingDescriptionCount = 1;
 		vertex_input_state.pVertexBindingDescriptions = vertex_input_bindings;
-		vertex_input_state.vertexAttributeDescriptionCount = 3;
+		vertex_input_state.vertexAttributeDescriptionCount = 2;
 		vertex_input_state.pVertexAttributeDescriptions = vertex_input_attributes;
 
 		VkPipelineInputAssemblyStateCreateInfo input_assembly_state {};
@@ -162,9 +163,53 @@ static HelloTrianglePipeline *hello_triangle = nullptr;
 static LGE::GPUBuffer hello_buffer;
 
 static const float buffer_data[] = {
-	0.0f,	-0.5f,	0.0f,	1.0f,	1.0f,	0.0f,	0.0f,	1.0f,
-	0.5f,	0.5f,	0.0f,	1.0f,	0.0f,	1.0f,	0.0f,	1.0f,
-	-0.5f,	0.5f,	0.0f,	1.0f,	0.0f,	0.0f,	1.0f,	1.0f
+	// front
+	-1.0f,	-1.0f,	-1.0f,	1.0f,	1.0f,	0.0f,	0.0f,	1.0f,	// near bottom left
+	-1.0f,	1.0f,	-1.0f,	1.0f,	1.0f,	0.0f,	0.0f,	1.0f,	// near top left
+	1.0f,	-1.0f,	-1.0f,	1.0f,	1.0f,	0.0f,	0.0f,	1.0f,	// near bottom right
+	1.0f,	-1.0f,	-1.0f,	1.0f,	1.0f,	0.0f,	0.0f,	1.0f,	// near bottom right
+	-1.0f,	1.0f,	-1.0f,	1.0f,	1.0f,	0.0f,	0.0f,	1.0f,	// near top left
+	1.0f,	1.0f,	-1.0f,	1.0f,	1.0f,	0.0f,	0.0f,	1.0f,	// near top right
+
+	// back
+	-1.0f,	-1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	1.0f,	1.0f,	// far bottom left
+	1.0f,	-1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	1.0f,	1.0f,	// far bottom right
+	-1.0f,	1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	1.0f,	1.0f,	// far top left
+	-1.0f,	1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	1.0f,	1.0f,	// far top left
+	1.0f,	-1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	1.0f,	1.0f,	// far bottom right
+	1.0f,	1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	1.0f,	1.0f,	// far top right
+
+	// left
+	-1.0f,	-1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	0.0f,	1.0f,	// far bottom left
+	-1.0f,	1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	0.0f,	1.0f,	// far top left
+	-1.0f,	-1.0f,	-1.0f,	1.0f,	0.0f,	1.0f,	0.0f,	1.0f,	// near bottom left
+	-1.0f,	-1.0f,	-1.0f,	1.0f,	0.0f,	1.0f,	0.0f,	1.0f,	// near bottom left
+	-1.0f,	1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	0.0f,	1.0f,	// far top left
+	-1.0f,	1.0f,	-1.0f,	1.0f,	0.0f,	1.0f,	0.0f,	1.0f,	// near top left
+
+	// right
+	1.0f,	-1.0f,	1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	1.0f,	// far bottom right
+	1.0f,	-1.0f,	-1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	1.0f,	// near bottom right
+	1.0f,	1.0f,	1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	1.0f,	// far top right
+	1.0f,	1.0f,	1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	1.0f,	// far top right
+	1.0f,	-1.0f,	-1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	1.0f,	// near bottom right
+	1.0f,	1.0f,	-1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	1.0f,	// near top right
+
+	// top
+	-1.0f,	1.0f,	-1.0f,	1.0f,	0.0f,	0.0f,	1.0f,	1.0f,	// near top left
+	-1.0f,	1.0f,	1.0f,	1.0f,	0.0f,	0.0f,	1.0f,	1.0f,	// far top left
+	1.0f,	1.0f,	-1.0f,	1.0f,	0.0f,	0.0f,	1.0f,	1.0f,	// near top right
+	1.0f,	1.0f,	-1.0f,	1.0f,	0.0f,	0.0f,	1.0f,	1.0f,	// near top right
+	-1.0f,	1.0f,	1.0f,	1.0f,	0.0f,	0.0f,	1.0f,	1.0f,	// far top left
+	1.0f,	1.0f,	1.0f,	1.0f,	0.0f,	0.0f,	1.0f,	1.0f,	// far top right
+
+	// bottom
+	-1.0f,	-1.0f,	-1.0f,	1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	// near bottom left
+	1.0f,	-1.0f,	-1.0f,	1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	// near bottom right
+	-1.0f,	-1.0f,	1.0f,	1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	// far bottom left
+	-1.0f,	-1.0f,	1.0f,	1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	// far bottom left
+	1.0f,	-1.0f,	-1.0f,	1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	// near bottom right
+	1.0f,	-1.0f,	1.0f,	1.0f,	1.0f,	1.0f,	0.0f,	1.0f,	// far bottom right
 };
 
 class ExampleApplication : public LGE::Application {
@@ -183,7 +228,7 @@ public:
 			bindings[0].binding = 0;
 			bindings[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 			bindings[0].descriptorCount = 1;
-			bindings[0].stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+			bindings[0].stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
 			VkDescriptorSetLayoutCreateInfo ci {};
 			ci.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
@@ -207,48 +252,58 @@ public:
 		viewport.height = (float) m_extent.height;
 		viewport.minDepth = 0.0f;
 		viewport.maxDepth = 1.0f;
+		vkCmdSetViewport (cmd, 0, 1, &viewport);
 
 		VkRect2D scissor {};
 		scissor.extent = m_extent;
-
-		VkDescriptorSet set = LGE::CreateTemporaryDescriptorSet (set_layout);
-
-		float uniform_vars[1] = { 1.5f + 0.5f * std::sinf (vkfwGetTime () / 250000.0f) };
-		VkDescriptorBufferInfo b {};
-		b.buffer = LGE::MMCreateTemporaryGPUBuffer (uniform_vars, sizeof (uniform_vars),
-			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
-		b.range = VK_WHOLE_SIZE;
-		VkWriteDescriptorSet w {};
-		w.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-		w.dstSet = set;
-		w.dstBinding = 0;
-		w.dstArrayElement = 0;
-		w.descriptorCount = 1;
-		w.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		w.pBufferInfo = &b;
-		vkUpdateDescriptorSets (LGE::gVkDevice, 1, &w, 0, nullptr);
+		vkCmdSetScissor (cmd, 0, 1, &scissor);
 
 		hello_triangle->Bind (cmd, VK_PIPELINE_BIND_POINT_GRAPHICS);
+
+		glm::mat4 perspective = glm::perspective (1.2f,
+			(float) m_extent.width / (float) m_extent.height,
+			0.1f, 100.0f);
+		glm::mat4 camera = glm::lookAt (
+			glm::vec3 (0.0f, 2.0f, 5.0f),
+			glm::vec3 (0.0f, 0.0f, 0.0f),
+			glm::vec3 (0.0f, 1.0f, 0.0f));
+
+		perspective[1] *= -1.0f; // OpenGL's y axis points up.
+
+		glm::mat4 view_projection = perspective * camera;
+
+		VkBuffer uniform = LGE::MMCreateTemporaryGPUBuffer (
+			&view_projection, sizeof (glm::mat4),
+			VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT);
+
+		VkDescriptorBufferInfo buffer_info {};
+		buffer_info.buffer = uniform;
+		buffer_info.range = VK_WHOLE_SIZE;
+
+		VkDescriptorSet set = LGE::CreateTemporaryDescriptorSet (set_layout);
+		VkWriteDescriptorSet writes[1] {};
+		writes[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+		writes[0].dstSet = set;
+		writes[0].dstBinding = 0;
+		writes[0].descriptorCount = 1;
+		writes[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		writes[0].pBufferInfo = &buffer_info;
+		vkUpdateDescriptorSets (LGE::gVkDevice, 1, writes, 0, nullptr);
+
+		glm::mat4 model = glm::rotate (glm::identity<glm::mat4> (),
+			(float) vkfwGetTime () / 500000,
+			glm::vec3 (0.0f, 1.0f, 0.0f));
+
+		vkCmdPushConstants (cmd, hello_triangle->m_layout,
+			VK_SHADER_STAGE_VERTEX_BIT, 0, sizeof (glm::mat4), &model);
+
 		vkCmdBindDescriptorSets (cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
 			hello_triangle->m_layout, 0, 1, &set, 0, nullptr);
 
-		vkCmdSetViewport (cmd, 0, 1, &viewport);
-		vkCmdSetScissor (cmd, 0, 1, &scissor);
-
-		float instance_info[] = {
-			-0.5f, 0.5f,
-			0.5f, 0.5f,
-			0.0f, -0.5f
-		};
-
-		VkDeviceSize offsets[2] = { 0, 0 };
-		VkBuffer buffers[2] = {
-			hello_buffer.m_buffer,
-			LGE::MMCreateTemporaryGPUBuffer (instance_info,
-				sizeof (instance_info), VK_BUFFER_USAGE_VERTEX_BUFFER_BIT)
-		};
-		vkCmdBindVertexBuffers (cmd, 0, 2, buffers, offsets);
-		vkCmdDraw (cmd, 3, sizeof (instance_info) / (2 * sizeof (float)), 0, 0);
+		VkDeviceSize offsets[1] = { 0 };
+		VkBuffer buffers[1] = { hello_buffer.m_buffer };
+		vkCmdBindVertexBuffers (cmd, 0, 1, buffers, offsets);
+		vkCmdDraw (cmd, sizeof (buffer_data) / 8 * sizeof (float), 1, 0, 0);
 	}
 
 	virtual void

@@ -13,11 +13,13 @@ set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set (BUILD_SHARED_LIBS OFF)
 
+add_subdirectory (vendor/glm)
 add_subdirectory (vendor/vkfw)
 
 add_library (lge)
 target_include_directories (lge PUBLIC include)
 
+target_link_libraries (lge glm::glm-header-only)
 target_link_libraries (lge vkfw)
 
 target_sources (lge PRIVATE
