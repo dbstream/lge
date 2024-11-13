@@ -106,8 +106,8 @@ public:
 	{
 		if (m_swapchain == VK_NULL_HANDLE)
 			return false;
-		return m_presentMode == VK_PRESENT_MODE_IMMEDIATE_KHR
-			|| m_presentMode == VK_PRESENT_MODE_MAILBOX_KHR;
+		return m_presentMode == VK_PRESENT_MODE_FIFO_KHR
+			|| m_presentMode == VK_PRESENT_MODE_FIFO_RELAXED_KHR;
 	}
 
 	/**
