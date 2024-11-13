@@ -30,6 +30,8 @@ private:
 	VkFence m_fences[CPU_RENDER_AHEAD];
 	VkSemaphore m_semaphores[2 * CPU_RENDER_AHEAD];
 
+	uint64_t m_prevFrameTime;
+
 protected:
 	VkRenderPass m_renderPass = VK_NULL_HANDLE;
 	VkFormat m_format;
@@ -146,6 +148,12 @@ public:
 	 */
 	virtual void
 	Cleanup (void);
+
+	/**
+	 * Get the index of the subpass that DebugUI should draw to.
+	 */
+	virtual uint32_t
+	GetDebugUISubpass (void);
 };
 
 extern Application *gApplication;

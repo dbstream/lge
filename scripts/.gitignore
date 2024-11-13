@@ -1,0 +1,6 @@
+##
+# Subdirectory .gitignore for scripts used when developing LGE.
+# Copyright (C) 2024  dbstream
+##
+
+generate_font

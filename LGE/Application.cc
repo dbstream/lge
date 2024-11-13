@@ -5,6 +5,7 @@
 #define LGE_MODULE "LGEApplication"
 
 #include <LGE/Application.h>
+#include <LGE/DebugUI.h>
 #include <LGE/GPUMemory.h>
 #include <LGE/Log.h>
 #include <LGE/Vulkan.h>
@@ -171,6 +172,17 @@ Application::Render (void)
 
 	this->BeginRendering (cmd, m_renderPass, m_framebuffer, gWindow->GetImageView (swapchain_index));
 	this->Draw (cmd);
+
+	uint64_t frame_time = vkfwGetTime ();
+	float delta_ms = (float) (frame_time - m_prevFrameTime) / 1000.0f;
+	m_prevFrameTime = frame_time;
+
+	DebugUIPrintf (20, 60, DebugUICorner::TOP_LEFT, 0.0f, 1.0f, 0.0f, 1.0f,
+		"framerate: %.1f", 1000.0f / delta_ms);
+	DebugUIPrintf (20, 72, DebugUICorner::TOP_LEFT, 0.0f, 1.0f, 0.0f, 1.0f,
+		"frametime: %.2f ms", delta_ms);
+	DebugUIDraw (cmd);
+
 	::vkCmdEndRenderPass (cmd);
 
 	result = ::vkEndCommandBuffer (cmd);
@@ -333,6 +345,12 @@ Application::Cleanup (void)
 			::vkDestroySemaphore (gVkDevice, m_semaphores[2 * i + 1], nullptr);
 		}
 	}
+}
+
+uint32_t
+Application::GetDebugUISubpass (void)
+{
+	return 0;
 }
 
 }

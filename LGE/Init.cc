@@ -5,6 +5,7 @@
 #define LGE_MODULE "LGEInit"
 
 #include <LGE/Application.h>
+#include <LGE/DebugUI.h>
 #include <LGE/Init.h>
 #include <LGE/Log.h>
 #include <LGE/Vulkan.h>
@@ -122,11 +123,26 @@ event_handler (VKFWevent *e, void *user)
 	}
 }
 
+template <void (*initializer) (void), void (*terminator) (void)>
+struct InitializeSystem {
+	InitializeSystem (void)
+	{
+		initializer ();
+	}
+
+	~InitializeSystem (void)
+	{
+		terminator ();
+	}
+};
+
 static void
 run_event_loop (void)
 {
 	VkResult result;
 	uint64_t prevFrameTime = vkfwGetTime ();
+
+	InitializeSystem<DebugUIInit, DebugUITerminate> debug_ui;
 
 	while (gApplication->KeepRunning ()) {
 		if (gWindow && gWindow->IsVsyncSwapchain ())
@@ -146,6 +162,10 @@ run_event_loop (void)
 		prevFrameTime = vkfwGetTime ();
 		gApplication->Render ();
 	}
+
+	result = ::vkDeviceWaitIdle (gVkDevice);
+	if (result != VK_SUCCESS)
+		Log ("warning: vkDeviceWaitIdle returned %s", VulkanTypeToString (result));
 }
 
 }

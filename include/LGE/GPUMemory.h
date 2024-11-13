@@ -85,6 +85,47 @@ MMCopyToGPUBuffer (GPUBuffer &target, const void *data, size_t size, size_t offs
 VkBuffer
 MMCreateTemporaryGPUBuffer (const void *data, size_t size, VkBufferUsageFlags usage);
 
+struct GPUImage {
+	VkImage m_image = VK_NULL_HANDLE;
+	VmaAllocation m_allocation = VK_NULL_HANDLE;
+
+	constexpr
+	operator bool (void) const
+	{
+		return m_image != VK_NULL_HANDLE;
+	}
+};
+
+/**
+ * Destroy the GPU image and free the associated memory.
+ *
+ * @param image image to destroy.
+ */
+void
+MMDestroyGPUImage (GPUImage &image);
+
+/**
+ * Create a GPU image.
+ *
+ * @param type image type.
+ * @param extent image extent. If 1D, y and z must be 1. If 2D, z must be 1.
+ * @param format image format.
+ * @param usage image usage.
+ */
+GPUImage
+MMCreateGPUImage (VkImageType type, VkExtent3D extent, VkFormat format,
+	VkImageUsageFlags usage);
+
+/**
+ * Upload a 2D texture to the GPU.
+ *
+ * @param format image format.
+ * @param extent image extent.
+ * @param data pixel data, must match format.
+ */
+GPUImage
+MMUploadTexture2D (VkFormat format, VkExtent2D extent, const void *data);
+
 /**
  * Tell the memory manager that the VkFence for rendering operations on a frame
  * has completed.
