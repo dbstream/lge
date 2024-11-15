@@ -177,10 +177,19 @@ Application::Render (void)
 	float delta_ms = (float) (frame_time - m_prevFrameTime) / 1000.0f;
 	m_prevFrameTime = frame_time;
 
+	m_averagedFrameTime += delta_ms;
+	m_numFpsFrames++;
+
+	if (m_averagedFrameTime >= 50.0f) {
+		m_displayedFrameTime = m_averagedFrameTime / m_numFpsFrames;
+		m_averagedFrameTime = 0.0f;
+		m_numFpsFrames = 0;
+	}
+
 	DebugUIPrintf (20, 60, DebugUICorner::TOP_LEFT, 0.0f, 1.0f, 0.0f, 1.0f,
-		"framerate: %.1f", 1000.0f / delta_ms);
+		"framerate: %.1f", 1000.0f / m_displayedFrameTime);
 	DebugUIPrintf (20, 72, DebugUICorner::TOP_LEFT, 0.0f, 1.0f, 0.0f, 1.0f,
-		"frametime: %.2f ms", delta_ms);
+		"frametime: %.2f ms", m_displayedFrameTime);
 	DebugUIDraw (cmd);
 
 	::vkCmdEndRenderPass (cmd);

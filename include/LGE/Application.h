@@ -30,7 +30,11 @@ private:
 	VkFence m_fences[CPU_RENDER_AHEAD];
 	VkSemaphore m_semaphores[2 * CPU_RENDER_AHEAD];
 
-	uint64_t m_prevFrameTime;
+	uint64_t m_prevFrameTime = 0;
+	float m_averagedFrameTime = 0.0f;
+	int m_numFpsFrames = 0;
+
+	float m_displayedFrameTime = 1.0f;
 
 protected:
 	VkRenderPass m_renderPass = VK_NULL_HANDLE;
