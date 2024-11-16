@@ -64,57 +64,58 @@ Application::Render (void)
 {
 	VkResult result;
 
-	if (m_commandPool == VK_NULL_HANDLE) {
+	if (m_commandPools[m_frameIndex] == VK_NULL_HANDLE) {
 		VkCommandPoolCreateInfo pool_ci {};
 		pool_ci.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-		pool_ci.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 		pool_ci.queueFamilyIndex = gVkQueueFamily;
 
-		result = ::vkCreateCommandPool (gVkDevice, &pool_ci, nullptr, &m_commandPool);
+		result = ::vkCreateCommandPool (gVkDevice, &pool_ci, nullptr, &m_commandPools[m_frameIndex]);
 		if (result != VK_SUCCESS)
 			throw std::runtime_error (std::string ("vkCreateCommandPool returned ") + VulkanTypeToString (result));
 
 		VkCommandBufferAllocateInfo cmd_ai {};
 		cmd_ai.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-		cmd_ai.commandPool = m_commandPool;
+		cmd_ai.commandPool = m_commandPools[m_frameIndex];
 		cmd_ai.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-		cmd_ai.commandBufferCount = CPU_RENDER_AHEAD;
-		result = ::vkAllocateCommandBuffers (gVkDevice, &cmd_ai, m_commandBuffers);
+		cmd_ai.commandBufferCount = 1;
+		result = ::vkAllocateCommandBuffers (gVkDevice, &cmd_ai, &m_commandBuffers[m_frameIndex]);
 		if (result != VK_SUCCESS) {
-			::vkDestroyCommandPool (gVkDevice, m_commandPool, nullptr);
-			m_commandPool = VK_NULL_HANDLE;
+			::vkDestroyCommandPool (gVkDevice, m_commandPools[m_frameIndex], nullptr);
+			m_commandPools[m_frameIndex] = VK_NULL_HANDLE;
 			throw std::runtime_error (std::string ("vkAllocateCommandBuffers returned ") + VulkanTypeToString (result));
 		}
 
 		VkFenceCreateInfo fence_ci {};
 		fence_ci.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
 		fence_ci.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-		for (size_t i = 0; i < CPU_RENDER_AHEAD; i++) {
-			result = ::vkCreateFence (gVkDevice, &fence_ci, nullptr, &m_fences[i]);
-			if (result != VK_SUCCESS) {
-				while (i)
-					::vkDestroyFence (gVkDevice, m_fences[--i], nullptr);
-				::vkDestroyCommandPool (gVkDevice, m_commandPool, nullptr);
-				m_commandPool = VK_NULL_HANDLE;
-				throw std::runtime_error (std::string ("vkCreateFence returned ") + VulkanTypeToString (result));
-			}
+		result = ::vkCreateFence (gVkDevice, &fence_ci, nullptr, &m_fences[m_frameIndex]);
+		if (result != VK_SUCCESS) {
+			::vkDestroyCommandPool (gVkDevice, m_commandPools[m_frameIndex], nullptr);
+			m_commandPools[m_frameIndex] = VK_NULL_HANDLE;
+			throw std::runtime_error (std::string ("vkCreateFence returned ") + VulkanTypeToString (result));
 		}
 
 		VkSemaphoreCreateInfo sema_ci {};
 		sema_ci.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-		for (size_t i = 0; i < 2 * CPU_RENDER_AHEAD; i++) {
-			result = ::vkCreateSemaphore (gVkDevice, &sema_ci, nullptr, &m_semaphores[i]);
-			if (result != VK_SUCCESS) {
-				while (i)
-					::vkDestroySemaphore (gVkDevice, m_semaphores[--i], nullptr);
-				for (i = CPU_RENDER_AHEAD; i; )
-					::vkDestroyFence (gVkDevice, m_fences[--i], nullptr);
-				::vkDestroyCommandPool (gVkDevice, m_commandPool, nullptr);
-				m_commandPool = VK_NULL_HANDLE;
-			}
+		result = ::vkCreateSemaphore (gVkDevice, &sema_ci, nullptr, &m_semaphores[2 * m_frameIndex]);
+		if (result != VK_SUCCESS) {
+			::vkDestroyFence (gVkDevice, m_fences[m_frameIndex], nullptr);
+			::vkDestroyCommandPool (gVkDevice, m_commandPools[m_frameIndex], nullptr);
+			m_commandPools[m_frameIndex] = VK_NULL_HANDLE;
+			throw std::runtime_error (std::string ("vkCreateSemaphore returned ") + VulkanTypeToString (result));
+		}
+
+		result = ::vkCreateSemaphore (gVkDevice, &sema_ci, nullptr, &m_semaphores[2 * m_frameIndex + 1]);
+		if (result != VK_SUCCESS) {
+			::vkDestroySemaphore (gVkDevice, m_semaphores[2 * m_frameIndex], nullptr);
+			::vkDestroyFence (gVkDevice, m_fences[m_frameIndex], nullptr);
+			::vkDestroyCommandPool (gVkDevice, m_commandPools[m_frameIndex], nullptr);
+			m_commandPools[m_frameIndex] = VK_NULL_HANDLE;
+			throw std::runtime_error (std::string ("vkCreateSemaphore returned ") + VulkanTypeToString (result));
 		}
 	}
 
+	VkCommandPool cmdpool = m_commandPools[m_frameIndex];
 	VkCommandBuffer cmd = m_commandBuffers[m_frameIndex];
 	VkFence fence = m_fences[m_frameIndex];
 	VkSemaphore sema0 = m_semaphores[2 * m_frameIndex + 0];
@@ -154,7 +155,7 @@ Application::Render (void)
 		m_framebuffer = this->CreateFramebuffer (m_renderPass);
 	}
 
-	result = ::vkResetCommandBuffer (cmd, 0);
+	result = ::vkResetCommandPool (gVkDevice, cmdpool, 0);
 	if (result != VK_SUCCESS)
 		throw std::runtime_error (std::string ("vkResetCommandBuffer returned ") + VulkanTypeToString (result));
 
@@ -344,14 +345,13 @@ Application::Cleanup (void)
 		m_renderPass = VK_NULL_HANDLE;
 	}
 
-	if (m_commandPool != VK_NULL_HANDLE) {
-		::vkDestroyCommandPool (gVkDevice, m_commandPool, nullptr);
-		m_commandPool = VK_NULL_HANDLE;
-
-		for (size_t i = 0; i < CPU_RENDER_AHEAD; i++) {
+	for (int i = 0; i < CPU_RENDER_AHEAD; i++) {
+		if (m_commandPools[i] != VK_NULL_HANDLE) {
+			::vkDestroySemaphore (gVkDevice, m_semaphores [2 * i + 1], nullptr);
+			::vkDestroySemaphore (gVkDevice, m_semaphores [2 * i], nullptr);
 			::vkDestroyFence (gVkDevice, m_fences[i], nullptr);
-			::vkDestroySemaphore (gVkDevice, m_semaphores[2 * i + 0], nullptr);
-			::vkDestroySemaphore (gVkDevice, m_semaphores[2 * i + 1], nullptr);
+			::vkDestroyCommandPool (gVkDevice, m_commandPools[i], nullptr);
+			m_commandPools[i] = nullptr;
 		}
 	}
 }
