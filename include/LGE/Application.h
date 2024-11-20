@@ -25,10 +25,10 @@ private:
 	size_t m_frameIndex = 0;
 
 	VkFramebuffer m_framebuffer = VK_NULL_HANDLE;
-	VkCommandPool m_commandPools[CPU_RENDER_AHEAD];
-	VkCommandBuffer m_commandBuffers[CPU_RENDER_AHEAD];
-	VkFence m_fences[CPU_RENDER_AHEAD];
-	VkSemaphore m_semaphores[2 * CPU_RENDER_AHEAD];
+	VkCommandPool m_commandPools[CPU_RENDER_AHEAD] {};
+	VkCommandBuffer m_commandBuffers[CPU_RENDER_AHEAD] {};
+	VkFence m_fences[CPU_RENDER_AHEAD] {};
+	VkSemaphore m_semaphores[2 * CPU_RENDER_AHEAD] {};
 
 	uint64_t m_prevFrameTime = 0;
 	float m_averagedFrameTime = 0.0f;
