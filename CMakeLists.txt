@@ -4,10 +4,6 @@
 cmake_minimum_required (VERSION 3.25)
 project (lge LANGUAGES CXX)
 
-if (NOT UNIX)
-	message (FATAL_ERROR "The only supported platform right now ix Unix.")
-endif ()
-
 set (CMAKE_CXX_STANDARD 20)
 set (CMAKE_CXX_STANDARD_REQUIRED ON)
 
