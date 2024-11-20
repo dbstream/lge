@@ -1,0 +1,4 @@
+# Force compliant editors to use LF line endings. Overrides Win32 default.
+
+[*]
+end_of_line = lf
