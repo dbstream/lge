@@ -291,7 +291,7 @@ public:
 		vkUpdateDescriptorSets (LGE::gVkDevice, 1, writes, 0, nullptr);
 
 		glm::mat4 model = glm::rotate (glm::identity<glm::mat4> (),
-			(float) vkfwGetTime () / 500000,
+			(float) (vkfwGetTime () % 3141592) / 500000,
 			glm::vec3 (0.0f, 1.0f, 0.0f));
 
 		vkCmdPushConstants (cmd, hello_triangle->m_layout,
