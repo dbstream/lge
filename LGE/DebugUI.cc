@@ -410,6 +410,20 @@ DebugUIDraw (VkCommandBuffer cmd)
 		pipeline = new DebugUIPipeline;
 	pipeline->Bind (cmd, VK_PIPELINE_BIND_POINT_GRAPHICS);
 
+	VkRect2D scissor {};
+	scissor.extent = gWindow->GetSwapchainExtent ();
+
+	VkViewport viewport {};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	viewport.width = (float) scissor.extent.width;
+	viewport.height = (float) scissor.extent.height;
+
+	vkCmdSetScissor (cmd, 0, 1, &scissor);
+	vkCmdSetViewport (cmd, 0, 1, &viewport);
+
 	vkCmdBindDescriptorSets (cmd, VK_PIPELINE_BIND_POINT_GRAPHICS,
 		pipeline->m_layout, 0, 1, &descriptor_set, 0, nullptr);
 
